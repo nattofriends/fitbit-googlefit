@@ -227,29 +227,25 @@ class Remote:
 		date_obj = self.convertor.parseHumanReadableDate(date_stamp)
 
 		# Get sleep data for a given date
-		fitbitSleeps = self.ReadFromFitbit(self.fitbitClient.get_sleep,date_obj)['sleep']
+		fitbitSleeps = self.ReadFromFitbit(self.fitbitClient.get_sleep_v12,date_obj)['sleep']
 
 		# Iterate over each sleep log for that day
 		sleep_count = 0
 		for fit_sleep in fitbitSleeps:
-			minute_points = fit_sleep['minuteData']
+			data_points = fit_sleep['levels']['data']
+			start_time_ms = self.convertor.EpochOfFitbitTimestamp(fit_sleep['startTime'])
+			end_time_ms = self.convertor.EpochOfFitbitTimestamp(fit_sleep['endTime'])
+
 			sleep_count += 1
-
-			# save first time stamp for comparison
-			start_time = minute_points[0]['dateTime']
-			# convert to date, add 1 day, convert back to string
-			next_date_stamp = (datetime.strptime(date_stamp, DATE_FORMAT) + timedelta(1)).strftime(DATE_FORMAT)
-
 			# convert all fitbit data points to google fit data points
-			googlePoints = [self.convertor.ConvertFibitPoint((date_stamp if start_time <= point['dateTime'] else \
-				next_date_stamp),point,'sleep') for point in minute_points]
+			google_points = [self.convertor.ConvertFibitPoint("", point, 'sleep') for point in data_points]
 
 			# 1. Write a fit session about sleep
-			google_session = self.convertor.ConvertGFitSleepSession(googlePoints, fit_sleep['logId'])
+			google_session = self.convertor.ConvertGFitSleepSession(fit_sleep['duration'], start_time_ms, end_time_ms, fit_sleep['logId'])
 			self.WriteSessionToGoogleFit(google_session)
 
 			# 2. create activity segment data points for the activity
-			self.WriteToGoogleFit(dataSourceId, googlePoints)
+			self.WriteToGoogleFit(dataSourceId, google_points)
 
 		print("synced sleep - {} logs".format(sleep_count))
 

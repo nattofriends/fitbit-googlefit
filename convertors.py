@@ -204,42 +204,46 @@ class Convertor:
 		epoch_time_nanos = self.nano(self.EpochOfFitbitTimestamp(timestamp))
 
 		# Convert sleep data point to google fit sleep types
-		if data_point['value'] == 1:
-			sleepType = 72
-		elif data_point['value'] == 2:
-			sleepType = 109
-		elif data_point['value'] == 3:
-			sleepType = 112
-		else:
-			sleepType = 72
+		# https://developers.google.com/fit/datatypes/sleep#rest
+		fitbit_to_gfit_conversion = {
+			'deep': 5,
+			'light': 4,
+			'rem': 6,
+			'wake': 1,
+
+			# Classic
+			'asleep': 2,
+			'restless': 0,
+			'awake': 1,
+		}
+
+		sleepType = fitbit_to_gfit_conversion.get(data_point['level'], 2)
 
 		return dict(
-			dataTypeName='com.google.activity.segment',
+			dataTypeName='com.google.sleep.segment',
 			startTimeNanos=epoch_time_nanos,
-			endTimeNanos=epoch_time_nanos + self.NANOS_PER_MINUTE,
+			endTimeNanos=epoch_time_nanos + data_point['seconds'] * 1000000000,  # + duration of this data in nanoseconds
 			value=[dict(intVal=sleepType)]
-			)
+		)
 
 
-	def ConvertGFitSleepSession(self, sleep_points, logId):
+	def ConvertGFitSleepSession(self, duration_ms, start_time_ms, end_time_ms, log_id):
 		"""Converts a list of Google Fit sleep points to Google fit session
-
-		sleep_points -- Google Fit sleep points
+		start_time_ms -- Sleep start time in ms
+		end_time_ms -- Sleep start time in ms
 		"""
-		minLogMillis = min([point['startTimeNanos'] for point in sleep_points]) / 10**6
-		maxLogMillis = max([point['endTimeNanos'] for point in sleep_points]) / 10**6
 
 		return dict(
 			modifiedTimeMillis=int((time.time() * 1000)),
-			startTimeMillis=minLogMillis,
-			endTimeMillis=maxLogMillis,
-			activeTimeMillis=maxLogMillis-minLogMillis,
+			startTimeMillis=start_time_ms,
+			endTimeMillis=end_time_ms,
+			activeTimeMillis=duration_ms,
 			description='A Fitbit sleep log',
 			activityType=72,
-			application=dict(name='Fbit-Gfit',detailsUrl=''),
-			id='io.pkp.fbit-gfit:fitbit:{}'.format(logId),
+			application=dict(name='Fbit-Gfit', detailsUrl=''),
+			id='io.pkp.fbit-gfit:fitbit:{}'.format(log_id),
 			name='Sleep'
-			)
+		)
 
 	def ConvertFitbitActivityLog(self, activity):
 		"""Converts a single Fitbit activity log to Google fit session
@@ -334,7 +338,9 @@ class Convertor:
 			dataType=dict(name='com.google.heart_rate.bpm',field=[dict(name='bpm',format='floatPoint')])
 		elif type == 'calories':
 			dataType=dict(name='com.google.calories.expended',field=[dict(name='calories',format='floatPoint')])
-		elif type in ('activity','sleep'):
+		elif type == 'sleep':
+			dataType=dict(name='com.google.sleep.segment')
+		elif type == 'activity':
 			dataType=dict(name='com.google.activity.segment',field=[dict(name='activity',format='integer')])
 		else:
 			raise ValueError("Unexpected data type given!")

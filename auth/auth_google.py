@@ -20,7 +20,8 @@ def main():
     activity = "https://www.googleapis.com/auth/fitness.activity.write"
     body = "https://www.googleapis.com/auth/fitness.body.write"
     location = "https://www.googleapis.com/auth/fitness.location.write"
-    scopes = activity + " " + body + " " + location
+    sleep = "https://www.googleapis.com/auth/fitness.sleep.write"
+    scopes = activity + " " + body + " " + location + " " + sleep
 
     flow = OAuth2WebServerFlow(args.id, args.secret, scopes)
     storage = Storage('google.json')
